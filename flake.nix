@@ -2,7 +2,7 @@
   description = "A very basic flake";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
+    nixpkgs.url = "github:volesen/nixpkgs";
   };
 
   outputs = { self, nixpkgs }:
@@ -10,9 +10,8 @@
       system = "aarch64-darwin";
       pkgs = import nixpkgs { inherit system; };
 
-      moltenvk-vulkan-sdk = builtins.fetchTarball {
-        url = "https://github.com/KhronosGroup/MoltenVK/releases/download/v1.2.6/MoltenVK-macos.tar";
-        sha256 = "sha256:10lrzjfs7ba2mfcmg5fjy5n1np5wrmxf6nqjqg02512whv2dhmcb";
+      moltenvk = pkgs.darwin.moltenvk.override {
+        enableStatic = true;
       };
 
       frameworks = with pkgs.darwin.apple_sdk.frameworks;
@@ -72,24 +71,32 @@
           hash = "sha256-anJgPEeHIW2qIALMfPduBVgbYYyz1PWCmPsZZxS9oHI=";
         };
 
-        sconsFlags = "platform=macos vulkan_sdk_path=${moltenvk-vulkan-sdk}";
+        sconsFlags = "platform=macos vulkan_sdk_path=${moltenvk}/lib";
 
         patchPhase = with pkgs.darwin.apple_sdk.frameworks; ''
-          # https://github.com/llvm/llvm-project/issues/48757
-          echo '    env.Append(CCFLAGS=["-Wno-elaborated-enum-base"])' >> platform/macos/detect.py
-
-          echo '    env.Prepend(CPPPATH=["${pkgs.darwin.libobjc}/include/", "${pkgs.darwin.apple_sdk_11_0.libs.libDER}/include/", "${pkgs.darwin.apple_sdk_11_0.libs.simd}/include/"])' >> platform/macos/detect.py
-          echo '    env.Append(FRAMEWORKPATH=[${frameworkPaths}])' >> platform/macos/detect.py
-          echo '    env.Append(LINKFLAGS=["-L${pkgs.zlib}/lib/"])' >> platform/macos/detect.py
+          cat <<EOF >> platform/macos/detect.py
+              # https://github.com/llvm/llvm-project/issues/48757
+              env.Append(CCFLAGS=["-Wno-elaborated-enum-base"])
+              env.Prepend(
+                  CPPPATH=[
+                      "${pkgs.darwin.libobjc}/include/",
+                      "${pkgs.darwin.apple_sdk_11_0.libs.libDER}/include/",
+                      "${pkgs.darwin.apple_sdk_11_0.libs.simd}/include/",
+                  ]
+              )
+              env.Append(FRAMEWORKPATH=[${frameworkPaths}])
+              env.Append(LINKFLAGS=["-L${pkgs.zlib}/lib/"])
+          EOF
         '';
 
         nativeBuildInputs = frameworks ++ (with pkgs; [
           scons
           xcbuild
+          moltenvk
         ]);
 
         buildInputs = with pkgs; [
-          pkgs.zlib
+          zlib
         ];
 
         installPhase = ''
@@ -100,13 +107,10 @@
       };
     in
     {
-
       packages.aarch64-darwin.godot = godot;
-      packages.aarch64-darwin.moltenvk-vulkan-sdk = moltenvk-vulkan-sdk;
 
       packages.aarch64-darwin.default = self.packages.aarch64-darwin.godot;
 
       formatter.aarch64-darwin = nixpkgs.legacyPackages.aarch64-darwin.nixpkgs-fmt;
-
     };
 }
