@@ -10,19 +10,10 @@
       system = "aarch64-darwin";
       pkgs = import nixpkgs { inherit system; };
 
-      moltenvk-vulkan-sdk = pkgs.stdenv.mkDerivation {
-        name = "moltenvk-vulkan-sdk";
-        version = "1.2.189";
-        src = pkgs.fetchurl {
-          url = "https://github.com/KhronosGroup/MoltenVK/releases/download/v1.2.6/MoltenVK-macos.tar";
-          hash = "sha256-/t7hLtOjxSqRNCjtiwNct7bpIByg8uXQ9rCCivv5LZU=";
-        };
-        installPhase = ''
-          mkdir -p $out
-          cp -r * $out
-        '';
+      moltenvk-vulkan-sdk = builtins.fetchTarball {
+        url = "https://github.com/KhronosGroup/MoltenVK/releases/download/v1.2.6/MoltenVK-macos.tar";
+        sha256 = "sha256:10lrzjfs7ba2mfcmg5fjy5n1np5wrmxf6nqjqg02512whv2dhmcb";
       };
-
 
       frameworks = with pkgs.darwin.apple_sdk.frameworks;
         [
@@ -43,7 +34,7 @@
           # https://github.com/godotengine/godot/blob/3978628c6cc1227250fc6ed45c8d854d24c30c30/platform/macos/detect.py#L244C32-L244C79
           Metal
           IOSurface
-          # Trial and error
+          # Transitive frameworks
           AppKit
           Foundation
           CoreFoundation
@@ -70,7 +61,6 @@
       frameworkPaths = builtins.concatStringsSep ", " (map (f: "\"${f}/Library/Frameworks\"") frameworks);
 
       godot = pkgs.darwin.apple_sdk.stdenv.mkDerivation {
-        sandbox = false;
         name = "godot4";
 
         version = "4.2.2-stable";
